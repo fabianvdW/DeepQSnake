@@ -1,22 +1,23 @@
 import tensorflow as tf
+import keras
 from keras.models import Model
-from keras.layers import Input, Flatten, Conv2D, MaxPooling2D, Dense, Activation
+from keras.layers import Input, Flatten, Conv2D, Dense, Activation
 from env import *
+from hyperparameters import *
 
 
 class DeepQModel(Model):
 
     def train_step(self, data):
-        x ,y = data
+        x, (actions, targets) = data
         with tf.GradientTape() as tape:
-            actions = tf.cast(y[:, 1], tf.int32)
             y_pred = self(x, training=True)
-            y_pred = tf.gather(y_pred, actions, axis=1, batch_dims=1)
-            loss = self.compiled_loss(y[:, 0], y_pred, regularization_losses = self.losses)
+            q_values = tf.gather(y_pred, actions, axis=1, batch_dims=1)
+            loss = self.compiled_loss(targets, q_values, regularization_losses=self.losses)
         trainable_vars = self.trainable_variables
         gradients = tape.gradient(loss, trainable_vars)
         self.optimizer.apply_gradients(zip(gradients, trainable_vars))
-        self.compiled_metrics.update_state(y, y_pred)
+        self.compiled_metrics.update_state(targets, q_values)
         return {m.name: m.result() for m in self.metrics}
 
     def get_qs(self, state):
@@ -50,18 +51,16 @@ class DeepQModel(Model):
 
 def compile_model():
     inputs = Input(shape=(WIDTH, HEIGHT, CHANNELS))
-    x = Conv2D(16, kernel_size=3)(inputs)
+    x = Conv2D(12, kernel_size=3)(inputs)
     x = Activation("relu")(x)
-    #x = MaxPooling2D()(x)
-    x = Conv2D(16, kernel_size=3)(x)
+    x = Conv2D(12, kernel_size=3, padding="same")(x)
     x = Activation("relu")(x)
-    #x = MaxPooling2D()(x)
     x = Flatten()(x)
-    x = Dense(16)(x)
+    x = Dense(12)(x)
     x = Activation("relu")(x)
-    x = Dense(16)(x)
+    x = Dense(12)(x)
     x = Activation("relu")(x)
     x = Dense(4)(x)
     model = DeepQModel(inputs, x)
-    model.compile(optimizer="adam", loss="mse")
+    model.compile(optimizer=keras.optimizers.Adam(lr=0.001 * ALPHA), loss="mse")
     return model

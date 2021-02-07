@@ -1,23 +1,10 @@
 from env import *
+from hyperparameters import *
 from deepqmodel import *
 from vis import *
 import os
 import random
 from collections import deque
-
-REPLAY_MEMORY_SIZE = 1_000_000
-MIN_REPLAY_MEMORY_SIZE = 50000
-BATCH_SIZE = 32
-
-TRAIN_EVERY_K_STEPS = 4
-UPDATE_STABLE_MODEL_EVERY = 5
-EVALUATE_EVERY = 50
-EVALUATE_GAMES = 10
-
-DISCOUNT = 0.995
-EPSILON = 1
-SCALE_EPSILON = 0.9995
-MIN_EPSILON = 0.001
 
 
 class Agent:
@@ -43,6 +30,12 @@ class Agent:
         self.experience_replay.append((board, action, reward, new_state))
         return score
 
+    def update_stable_model(self):
+        weights = []
+        for (model_weights, stable_model_weights) in zip(self.model.get_weights(), self.stable_model.get_weights()):
+            weights.append(stable_model_weights + STABLE_MODEL_TAU * (model_weights - stable_model_weights))
+        self.stable_model.set_weights(weights)
+
     def get_action(self, state, train=True):
         if train and np.random.rand() < self.epsilon:
             return random_action()
@@ -50,19 +43,20 @@ class Agent:
             return self.stable_model.get_action(state)
 
     def train_step(self, verbose):
-        if len(self.experience_replay) < MIN_REPLAY_MEMORY_SIZE:
-            return
         experiences = random.sample(self.experience_replay, BATCH_SIZE)
 
-        def get_maxq(experience):
+        def get_next_q(experience):
             if experience[3] is None:
                 return 0
             else:
-                return np.max(self.stable_model.get_qs(experience[3]))
+                next_qs = self.stable_model.get_qs(experience[3])
+                best_action = self.model.get_action(experience[3])
+                return next_qs[best_action]
 
-        targets = np.array([[x[2] + DISCOUNT * get_maxq(x), x[1]] for x in experiences])
         x = np.array([x[0] for x in experiences])
-        self.model.fit(x, targets, batch_size=BATCH_SIZE, shuffle=False, verbose=verbose)
+        actions = np.array([x[1] for x in experiences], dtype=np.int32)
+        targets = np.array([x[2] + DISCOUNT * get_next_q(x) for x in experiences])
+        self.model.fit(x, (actions, targets), batch_size=BATCH_SIZE, shuffle=False, verbose=verbose)
 
     def train(self, episodes, log_path="log.csv", video_folder="./videos/", model_folder="./models/"):
         if os.path.exists(log_path):
@@ -81,8 +75,11 @@ class Agent:
                 game_over = self.experience_replay[-1][3] is None
                 steps += 1
                 global_steps += 1
-                if game_over or global_steps % TRAIN_EVERY_K_STEPS == 0:
-                    self.train_step(verbose=int(game_over))
+                if len(self.experience_replay) >= MIN_REPLAY_MEMORY_SIZE:
+                    if game_over or global_steps % TRAIN_EVERY_K_STEPS == 0:
+                        self.train_step(verbose=int(game_over))
+                    if global_steps % UPDATE_STABLE_MODEL_EVERY_K_STEPS == 0:
+                        self.update_stable_model()
                 avg_reward += self.experience_replay[-1][2]
             avg_reward /= steps
             avg_rewards_last_100.append((avg_reward * steps, steps))
@@ -94,8 +91,7 @@ class Agent:
 
             self.episodes += 1
             self.epsilon = np.clip(self.epsilon * SCALE_EPSILON, MIN_EPSILON, np.inf)
-            if self.episodes % UPDATE_STABLE_MODEL_EVERY == 0:
-                self.stable_model.set_weights(self.model.get_weights())
+
             reward_last_100 = 0
             sum_steps = 0
             for (avg, _steps) in avg_rewards_last_100:
