@@ -1,9 +1,9 @@
 from env import *
 from hyperparameters import *
+from pexp_replay import *
 from deepqmodel import *
 from vis import *
 import os
-import random
 from collections import deque
 
 
@@ -16,7 +16,7 @@ class Agent:
         self.episodes = 0
         self.env = Env()
         self.epsilon = EPSILON
-        self.experience_replay = deque(maxlen=REPLAY_MEMORY_SIZE)
+        self.experience_replay = PrioritizedExperienceReplay()
 
     def gen_experience(self):
         board = np.copy(self.env.board)
@@ -27,8 +27,8 @@ class Agent:
         if game_over:
             self.env.reset()
             new_state = None
-        self.experience_replay.append((board, action, reward, new_state))
-        return score
+        self.experience_replay.add_experience((board, action, reward, new_state))
+        return score, game_over
 
     def update_stable_model(self):
         weights = []
@@ -43,7 +43,8 @@ class Agent:
             return self.stable_model.get_action(state)
 
     def train_step(self, verbose):
-        experiences = random.sample(self.experience_replay, BATCH_SIZE)
+        experiences, sample_weights, indices = self.experience_replay.sample()
+        sample_weights = sample_weights ** EXPONENT_B(self.epsilon)
 
         def get_next_q(experience):
             if experience[3] is None:
@@ -56,7 +57,10 @@ class Agent:
         x = np.array([x[0] for x in experiences])
         actions = np.array([x[1] for x in experiences], dtype=np.int32)
         targets = np.array([x[2] + DISCOUNT * get_next_q(x) for x in experiences])
-        self.model.fit(x, (actions, targets), batch_size=BATCH_SIZE, shuffle=False, verbose=verbose)
+        hist = self.model.fit(x, (actions, targets), sample_weight=sample_weights, batch_size=BATCH_SIZE, shuffle=False,
+                              verbose=verbose)
+        errors = hist.history["ae_batch"][0]
+        self.experience_replay.update_priorities(indices, errors)
 
     def train(self, episodes, log_path="log.csv", video_folder="./videos/", model_folder="./models/"):
         if os.path.exists(log_path):
@@ -71,8 +75,7 @@ class Agent:
             score = 0
             steps = 0
             while not game_over:
-                score = self.gen_experience()
-                game_over = self.experience_replay[-1][3] is None
+                score, game_over = self.gen_experience()
                 steps += 1
                 global_steps += 1
                 if len(self.experience_replay) >= MIN_REPLAY_MEMORY_SIZE:
@@ -124,4 +127,4 @@ class Agent:
 
 if __name__ == "__main__":
     agent = Agent()
-    agent.train(100000, log_path="log.csv", video_folder="./videos/", model_folder="./models/")
+    agent.train(100000, log_path="log2.csv", video_folder="./videos2/", model_folder="./models2/")

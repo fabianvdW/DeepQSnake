@@ -6,14 +6,29 @@ from env import *
 from hyperparameters import *
 
 
-class DeepQModel(Model):
+class AEMetric(tf.keras.metrics.Metric):
+    def __init__(self, name="ae_batch", **kwargs):
+        super(AEMetric, self).__init__(name=name, **kwargs)
+        self.absolute_error = self.add_weight(name="ae", initializer='zeros')
 
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        self.absolute_error = tf.math.abs(y_true - y_pred)
+
+    def result(self):
+        return self.absolute_error
+
+    def reset_states(self):
+        pass
+
+
+class DeepQModel(Model):
     def train_step(self, data):
-        x, (actions, targets) = data
+        x, (actions, targets), sample_weight = data
         with tf.GradientTape() as tape:
             y_pred = self(x, training=True)
             q_values = tf.gather(y_pred, actions, axis=1, batch_dims=1)
-            loss = self.compiled_loss(targets, q_values, regularization_losses=self.losses)
+            loss = self.compiled_loss(tf.expand_dims(targets, 1), tf.expand_dims(q_values, 1),
+                                      regularization_losses=self.losses, sample_weight=sample_weight)
         trainable_vars = self.trainable_variables
         gradients = tape.gradient(loss, trainable_vars)
         self.optimizer.apply_gradients(zip(gradients, trainable_vars))
@@ -62,5 +77,5 @@ def compile_model():
     x = Activation("relu")(x)
     x = Dense(4)(x)
     model = DeepQModel(inputs, x)
-    model.compile(optimizer=keras.optimizers.Adam(lr=0.001 * ALPHA), loss="mse")
+    model.compile(optimizer=keras.optimizers.Adam(lr=0.001 * ALPHA), loss="mse", metrics=[AEMetric()])
     return model
