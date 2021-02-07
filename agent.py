@@ -14,7 +14,7 @@ UPDATE_STABLE_MODEL_EVERY = 5
 EVALUATE_EVERY = 50
 EVALUATE_GAMES = 10
 
-DISCOUNT = 0.999
+DISCOUNT = 0.995
 EPSILON = 1
 SCALE_EPSILON = 0.9995
 MIN_EPSILON = 0.001
@@ -84,7 +84,8 @@ class Agent:
                 if game_over or global_steps % TRAIN_EVERY_K_STEPS == 0:
                     self.train_step(verbose=int(game_over))
                 avg_reward += self.experience_replay[-1][2]
-            avg_rewards_last_100.append((avg_reward, steps))
+            avg_reward /= steps
+            avg_rewards_last_100.append((avg_reward * steps, steps))
             avg_scores_last_100.append(score)
 
             if len(self.experience_replay) < MIN_REPLAY_MEMORY_SIZE:
@@ -107,7 +108,7 @@ class Agent:
                     self.episodes, avg_reward, reward_last_100, score, score_last_100, len(self.experience_replay),
                     self.epsilon))
             log_file = open(log_path, 'a+')
-            log_file.write(str(self.episodes) + "e;" + str(score) + ";" + str(avg_reward) + "\n")
+            log_file.write(str(self.episodes) + ";" + str(score) + ";" + str(avg_reward) + "\n")
             log_file.close()
             if self.episodes % EVALUATE_EVERY == 0:
                 print("Evaluating Agent!...")
