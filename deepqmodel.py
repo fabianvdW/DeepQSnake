@@ -75,7 +75,9 @@ def compile_model():
     x = Activation("relu")(x)
     x = Dense(12)(x)
     x = Activation("relu")(x)
-    x = Dense(4)(x)
-    model = DeepQModel(inputs, x)
+    y = Dense(1)(x)
+    z = Dense(4)(x)
+    out = y - tf.math.reduce_mean(z, axis=1) + z
+    model = DeepQModel(inputs, out)
     model.compile(optimizer=keras.optimizers.Adam(lr=0.001 * ALPHA), loss="mse", metrics=[AEMetric()])
     return model

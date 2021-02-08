@@ -127,4 +127,4 @@ class Agent:
 
 if __name__ == "__main__":
     agent = Agent()
-    agent.train(100000, log_path="log.csv", video_folder="./videos/", model_folder="./models/")
+    agent.train(100000, log_path="log2.csv", video_folder="./videos2/", model_folder="./models2/")
