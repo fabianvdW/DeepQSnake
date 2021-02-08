@@ -5,7 +5,6 @@ from keras.layers import Input, Flatten, Conv2D, Dense, Activation
 from env import *
 from hyperparameters import *
 
-
 class AEMetric(tf.keras.metrics.Metric):
     def __init__(self, name="ae_batch", **kwargs):
         super(AEMetric, self).__init__(name=name, **kwargs)
@@ -77,7 +76,9 @@ def compile_model():
     x = Activation("relu")(x)
     y = Dense(1)(x)
     z = Dense(4)(x)
-    out = y - tf.math.reduce_mean(z, axis=1) + z
+    y = tf.reshape(y, [-1])
+    zmean = tf.reduce_mean(z, axis=1)
+    out = tf.expand_dims(y-zmean,1)+z
     model = DeepQModel(inputs, out)
     model.compile(optimizer=keras.optimizers.Adam(lr=0.001 * ALPHA), loss="mse", metrics=[AEMetric()])
     return model
