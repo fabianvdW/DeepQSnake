@@ -79,8 +79,8 @@ class Agent:
                 steps += 1
                 global_steps += 1
                 if len(self.experience_replay) >= MIN_REPLAY_MEMORY_SIZE:
-                    if game_over or global_steps % TRAIN_EVERY_K_STEPS == 0:
-                        self.train_step(verbose=int(game_over))
+                    if global_steps % TRAIN_EVERY_K_STEPS == 0:
+                        self.train_step(verbose=True)
                     if global_steps % UPDATE_STABLE_MODEL_EVERY_K_STEPS == 0:
                         self.update_stable_model()
                 avg_reward += self.experience_replay[-1][2]
@@ -127,4 +127,4 @@ class Agent:
 
 if __name__ == "__main__":
     agent = Agent()
-    agent.train(100000, log_path="log2.csv", video_folder="./videos2/", model_folder="./models2/")
+    agent.train(100000, log_path="log.csv", video_folder="./videos/", model_folder="./models/")

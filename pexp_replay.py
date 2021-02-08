@@ -15,7 +15,6 @@ class PrioritizedExperienceReplay:
 
     def get_sample_weight(self, probs):
         sample_weights = 1 / len(self.experience_replay) * 1 / probs
-        sample_weights /= np.max(sample_weights)
         return sample_weights
 
     def sample(self):
