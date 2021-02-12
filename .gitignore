@@ -1,5 +1,6 @@
 .idea
 *.h5
-*.mp4
+videos/*.mp4
+videos2/*.mp4
 __pycache__
 *.csv

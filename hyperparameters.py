@@ -1,5 +1,5 @@
 BATCH_SIZE = 64
-ALPHA = 0.1
+ALPHA = 0.01
 
 REPLAY_MEMORY_SIZE = 1_000_000
 MIN_REPLAY_MEMORY_SIZE = 50000
@@ -14,8 +14,8 @@ STABLE_MODEL_TAU = 1
 DISCOUNT = 1.
 
 EPSILON = 1
-SCALE_EPSILON = 0.9997
-MIN_EPSILON = 0.001
+SCALE_EPSILON = 0.9998
+MIN_EPSILON = 0.005
 
 # Those are just evaluation parameters. They don't actually effect the training
 EVALUATE_EVERY = 100
